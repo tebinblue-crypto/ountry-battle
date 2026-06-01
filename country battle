@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Country Battle</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700;900&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0a0a0a;font-family:'Inter',sans-serif;min-height:100vh;padding:12px;overflow-x:hidden}
+  .header{text-align:center;margin-bottom:10px}
+  .header h1{font-family:'Bebas Neue',sans-serif;font-size:40px;letter-spacing:4px;color:#fff}
+  .header h1 span{color:#ff0050}
+  .status{text-align:center;font-size:12px;margin-bottom:10px;padding:5px 12px;border-radius:20px;display:inline-block}
+  .status.connected{background:#0d2b1a;color:#27ae60;border:1px solid #27ae60}
+  .status.disconnected{background:#2b0d0d;color:#e74c3c;border:1px solid #e74c3c}
+  .status.connecting{background:#2b2200;color:#f39c12;border:1px solid #f39c12}
+  .status-wrap{text-align:center;margin-bottom:10px}
+  .goal-bar{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:10px}
+  .goal-bar label{color:#aaa;font-size:13px}
+  .goal-bar input{width:70px;background:#1a1a1a;border:1px solid #333;color:#fff;padding:4px 8px;border-radius:6px;font-size:13px;text-align:center}
+  .goal-bar button{background:#ff0050;color:#fff;border:none;padding:4px 12px;border-radius:6px;font-size:13px;cursor:pointer}
+  .table-wrap{width:100%;max-width:960px;margin:0 auto}
+  .row{display:grid;grid-template-columns:48px 44px 150px 1fr 56px;align-items:center;gap:0;border-bottom:1px solid #1a1a1a;padding:5px 0;transition:background 0.3s}
+  .row.winner-row{background:linear-gradient(90deg,#1a1200,#0a0a0a);border-bottom:1px solid #FFD700}
+  .row.flash{animation:flashAnim 0.5s ease}
+  @keyframes flashAnim{0%{background:#1a0a00}50%{background:#3d1f00}100%{background:transparent}}
+  .rank{text-align:center;font-size:16px;font-weight:900;color:#444;min-width:48px}
+  .rank.top1{color:#FFD700;font-size:20px}
+  .rank.top2{color:#C0C0C0;font-size:18px}
+  .rank.top3{color:#CD7F32;font-size:18px}
+  .flag{font-size:24px;text-align:center}
+  .name{color:#fff;font-weight:700;font-size:14px;padding:0 8px;letter-spacing:0.3px}
+  .bar-wrap{position:relative;background:#1a1a1a;border-radius:4px;height:26px;overflow:hidden;border:1px solid #222}
+  .bar{height:100%;border-radius:4px;transition:width 0.5s cubic-bezier(0.4,0,0.2,1);min-width:3px}
+  .bar-label{position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:10px;font-weight:700;color:rgba(255,255,255,0.4);pointer-events:none}
+  .pts{text-align:right;font-size:14px;font-weight:900;color:#fff;padding-left:8px;min-width:56px}
+  .winner-banner{display:none;text-align:center;padding:14px;margin:10px auto;max-width:960px;background:linear-gradient(90deg,#1a1200,#2a1f00,#1a1200);border:2px solid #FFD700;border-radius:12px;font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:3px;color:#FFD700}
+  .controls{display:flex;justify-content:center;gap:10px;margin-top:12px;flex-wrap:wrap}
+  .btn{background:#1a1a1a;color:#aaa;border:1px solid #333;padding:6px 16px;border-radius:8px;font-size:13px;cursor:pointer}
+  .btn:hover{background:#222;color:#fff}
+  .btn-reset{border-color:#ff0050;color:#ff0050}
+  .btn-reset:hover{background:#1a0008}
+  .log{max-width:960px;margin:12px auto 0;background:#0f0f0f;border:1px solid #1f1f1f;border-radius:8px;padding:8px 12px;max-height:80px;overflow-y:auto;font-size:11px;color:#555;font-family:monospace}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🏁 COUNTRY <span>BATTLE</span> 🏁</h1>
+</div>
+
+<div class="status-wrap">
+  <span class="status connecting" id="status">⏳ Conectando a TikFinity...</span>
+</div>
+
+<div class="goal-bar">
+  <label>Meta:</label>
+  <input type="number" id="goalInput" value="100" min="10" step="10"/>
+  <button onclick="updateGoal()">OK</button>
+  <span style="color:#444;font-size:12px">pts para ganar</span>
+</div>
+
+<div id="winnerBanner" class="winner-banner"></div>
+<div class="table-wrap" id="tableWrap"></div>
+
+<div class="controls">
+  <button class="btn btn-reset" onclick="resetAll()">↺ Reiniciar</button>
+</div>
+
+<div class="log" id="log"></div>
+
+<script>
+const COUNTRIES = [
+  {name:'México',      flag:'🇲🇽', giftId:null, giftName:'Maracas',          pts:0, color:'#ff4d4d'},
+  {name:'Argentina',   flag:'🇦🇷', giftId:null, giftName:'Cono de helado',    pts:0, color:'#74b9ff'},
+  {name:'Nicaragua',   flag:'🇳🇮', giftId:null, giftName:'TikTok',            pts:0, color:'#55efc4'},
+  {name:'Chile',       flag:'🇨🇱', giftId:null, giftName:"It's Corn",         pts:0, color:'#fd79a8'},
+  {name:'Perú',        flag:'🇵🇪', giftId:null, giftName:'Te adoro',          pts:0, color:'#ffeaa7'},
+  {name:'Guatemala',   flag:'🇬🇹', giftId:null, giftName:'White Rose',        pts:0, color:'#a29bfe'},
+  {name:'Colombia',    flag:'🇨🇴', giftId:null, giftName:'Alas Guardianes',   pts:0, color:'#fdcb6e'},
+  {name:'Ecuador',     flag:'🇪🇨', giftId:null, giftName:'Cake Slice',        pts:0, color:'#00cec9'},
+  {name:'Brasil',      flag:'🇧🇷', giftId:null, giftName:'Rose',              pts:0, color:'#6fcf97'},
+  {name:'USA',         flag:'🇺🇸', giftId:null, giftName:'Sticks',            pts:0, color:'#2d9cdb'},
+  {name:'El Salvador', flag:'🇸🇻', giftId:null, giftName:'GG',               pts:0, color:'#eb5757'},
+  {name:'Honduras',    flag:'🇭🇳', giftId:null, giftName:'Wink wink',         pts:0, color:'#56ccf2'},
+  {name:'Cuba',        flag:'🇨🇺', giftId:null, giftName:'Lucky Tree',        pts:0, color:'#27ae60'},
+  {name:'Puerto Rico', flag:'🇵🇷', giftId:null, giftName:'Classic',           pts:0, color:'#9b51e0'},
+];
+
+// Gifts que dan 100 pts al que los manda (por nombre)
+const MEGA_GIFTS = ['Galaxy','Heart Me'];
+
+let goal = 100;
+let gameOver = false;
+
+function updateGoal(){
+  const v = parseInt(document.getElementById('goalInput').value);
+  if(v>0){goal=v;render();}
+}
+
+function addLog(msg){
+  const el = document.getElementById('log');
+  const line = document.createElement('div');
+  line.textContent = new Date().toLocaleTimeString() + ' — ' + msg;
+  el.prepend(line);
+  if(el.children.length > 30) el.lastChild.remove();
+}
+
+function addPoints(country, pts){
+  if(gameOver) return;
+  country.pts += pts;
+  if(country.pts >= goal && !gameOver){
+    gameOver = true;
+    const b = document.getElementById('winnerBanner');
+    b.style.display = 'block';
+    b.innerHTML = `🏆 ${country.flag} ¡${country.name.toUpperCase()} GANA EL BATTLE! 🏆`;
+  }
+  render();
+  // Flash en la fila
+  setTimeout(()=>{
+    const row = document.getElementById('row-'+COUNTRIES.indexOf(country));
+    if(row){row.classList.add('flash');setTimeout(()=>row.classList.remove('flash'),500);}
+  },10);
+}
+
+function handleGift(data){
+  const name = (data.giftName||'').trim();
+  const pts = data.diamondCount || data.repeatCount || 1;
+
+  // Mega gifts — 100 pts al país del sender (no implementable sin saber país del viewer)
+  // Por ahora los logueamos
+  if(MEGA_GIFTS.some(g => name.toLowerCase().includes(g.toLowerCase()))){
+    addLog(`⭐ MEGA GIFT: ${name} x${pts} de ${data.uniqueId||'alguien'}`);
+    return;
+  }
+
+  // Buscar país por nombre del gift (case insensitive, partial match)
+  const country = COUNTRIES.find(c =>
+    name.toLowerCase().includes(c.giftName.toLowerCase()) ||
+    c.giftName.toLowerCase().includes(name.toLowerCase())
+  );
+
+  if(country){
+    addLog(`${country.flag} ${name} → ${country.name} +1`);
+    addPoints(country, 1);
+  } else {
+    addLog(`❓ Gift no mapeado: "${name}"`);
+  }
+}
+
+function resetAll(){
+  COUNTRIES.forEach(c=>c.pts=0);
+  gameOver=false;
+  document.getElementById('winnerBanner').style.display='none';
+  render();
+}
+
+function render(){
+  const sorted = [...COUNTRIES].map((c,i)=>({...c,orig:i})).sort((a,b)=>b.pts-a.pts);
+  const max = Math.max(...COUNTRIES.map(c=>c.pts),1);
+  const icons = ['🥇','🥈','🥉'];
+  document.getElementById('tableWrap').innerHTML = sorted.map((c,rank)=>{
+    const pct = Math.min(Math.round((c.pts/Math.max(goal,max))*100),100);
+    const rl = c.pts>0&&rank<3?icons[rank]:`${rank+1}`;
+    const rc = rank===0&&c.pts>0?'top1':rank===1&&c.pts>0?'top2':rank===2&&c.pts>0?'top3':'';
+    return `<div class="row${c.pts>=goal?' winner-row':''}" id="row-${c.orig}">
+      <div class="rank ${rc}">${rl}</div>
+      <div class="flag">${c.flag}</div>
+      <div class="name">${c.name}</div>
+      <div class="bar-wrap">
+        <div class="bar" style="width:${Math.max(pct,0.3)}%;background:${c.color}"></div>
+        <span class="bar-label">${c.giftName}</span>
+      </div>
+      <div class="pts">${c.pts}</div>
+    </div>`;
+  }).join('');
+}
+
+// WebSocket a TikFinity
+function connect(){
+  const st = document.getElementById('status');
+  st.className='status connecting';
+  st.textContent='⏳ Conectando a TikFinity...';
+
+  const ws = new WebSocket('ws://localhost:21213/');
+
+  ws.onopen = ()=>{
+    st.className='status connected';
+    st.textContent='🟢 Conectado a TikFinity — Live activo';
+    addLog('✅ Conectado a TikFinity WebSocket');
+  };
+
+  ws.onmessage = e=>{
+    try{
+      const msg = JSON.parse(e.data);
+      if(msg.event === 'gift' && msg.data){
+        handleGift(msg.data);
+      }
+    }catch(err){}
+  };
+
+  ws.onclose = ()=>{
+    st.className='status disconnected';
+    st.textContent='🔴 Desconectado — reconectando en 3s...';
+    addLog('❌ Desconectado. Reintentando...');
+    setTimeout(connect, 3000);
+  };
+
+  ws.onerror = ()=>{
+    st.className='status disconnected';
+    st.textContent='🔴 TikFinity no detectado — ¿está abierto?';
+  };
+}
+
+render();
+connect();
+</script>
+</body>
+</html>
